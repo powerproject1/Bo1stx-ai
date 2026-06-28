@@ -814,7 +814,7 @@
             await callAPI(s);
         }
 
-        // ---- Вызов API (исправлено) ----
+        // ---- Вызов API через прокси (обход CORS) ----
         async function callAPI(s) {
             userInput.disabled = true;
             sendBtn.disabled = true;
@@ -834,27 +834,58 @@
             }));
 
             try {
-                const res = await fetch(GEMINI_API, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents })
-                });
-                const data = await res.json();
+                // Используем несколько прокси-серверов для надежности
+                const proxies = [
+                    'https://corsproxy.io/?',
+                    'https://api.allorigins.win/raw?url=',
+                    'https://cors-anywhere.herokuapp.com/'
+                ];
+                
+                let lastError = null;
+                let data = null;
+                
+                // Пробуем каждый прокси по очереди
+                for (const proxy of proxies) {
+                    try {
+                        const targetUrl = proxy + encodeURIComponent(GEMINI_API);
+                        const res = await fetch(targetUrl, {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Origin': window.location.origin
+                            },
+                            body: JSON.stringify({ contents })
+                        });
+                        
+                        if (res.ok) {
+                            data = await res.json();
+                            break;
+                        }
+                    } catch (e) {
+                        lastError = e;
+                        continue;
+                    }
+                }
+                
                 loaderWrap.remove();
+
+                if (!data) {
+                    throw new Error('Не удалось получить ответ от AI. Проверьте интернет-соединение.');
+                }
 
                 const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (data.error) {
-                    appendBubble('ai', '❌ Ошибка: ' + data.error.message);
+                    appendBubble('ai', '❌ Ошибка: ' + JSON.stringify(data.error));
                 } else if (aiText) {
                     s.messages.push({ role: 'ai', text: aiText });
                     save();
                     appendBubble('ai', aiText);
                 } else {
-                    appendBubble('ai', '❌ Пустой ответ.');
+                    appendBubble('ai', '❌ Пустой ответ от AI.');
                 }
             } catch (err) {
                 loaderWrap.remove();
-                appendBubble('ai', '❌ Ошибка соединения: ' + err.message);
+                appendBubble('ai', '❌ Ошибка соединения: ' + err.message + '\n\nПопробуйте:\n1. Обновить страницу\n2. Проверить интернет\n3. Попробовать позже');
             } finally {
                 chatArea.scrollTop = chatArea.scrollHeight;
                 userInput.disabled = false;
