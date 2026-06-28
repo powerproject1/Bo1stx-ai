@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BOSTX AI</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+    <style>
+        /* --- Общие сбросы и база --- */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            background: #131314;
+            color: #e3e3e3;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: 230px;
+            min-width: 230px;
+            background: #1a1b1c;
+            border-right: 1px solid #2c2d2f;
+            display: flex;
+            flex-direction: column;
+            padding: 14px 10px;
+            gap: 8px;
+            transition: width 0.25s, min-width 0.25s, opacity 0.2s, padding 0.25s;
+            overflow: hidden;
+        }
+        .sidebar.hidden {
+            width: 0;
+            min-width: 0;
+            padding: 0;
+            opacity: 0;
+            pointer-events: none;
+            border: none;
+        }
+        .sidebar-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #2c2d2f;
+        }
+        .sidebar-logo {
+            font-size: 17px;
+            font-weight: 800;
+            background: linear-gradient(90deg, #4285f4, #9b51e0, #e91e63);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            white-space: nowrap;
+        }
+        .icon-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: #9aa0a6;
+            padding: 5px;
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            transition: background 0.15s, color 0.15s;
+        }
+        .icon-btn:hover {
+            background: #282a2c;
+            color: #fff;
+        }
+        .new-chat-btn {
+            background: transparent;
+            color: #ccced1;
+            border: 1px solid #3c3e40;
+            padding: 9px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: left;
+            white-space: nowrap;
+            transition: background 0.15s;
+            flex-shrink: 0;
+        }
+        .new-chat-btn:hover {
+            background: #282a2c;
+            color: #fff;
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            background: #111213;
+            border: 1px solid #2c2d2f;
+            border-radius: 8px;
+            padding: 6px 10px;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .search-box input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #e3e3e3;
+            font-size: 12px;
+            width: 100%;
+        }
+        .search-box input::placeholder {
+            color: #5f6368;
+        }
+        .search-icon {
+            color: #5f6368;
+            flex-shrink: 0;
+        }
+
+        .history-label {
+            font-size: 10px;
+            color: #5f6368;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 4px 4px 0;
+            flex-shrink: 0;
+        }
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-height: 0;
+        }
+        .history-list::-webkit-scrollbar {
+            width: 3px;
+        }
+        .history-list::-webkit-scrollbar-thumb {
+            background: #3c4043;
+            border-radius: 4px;
+        }
+
+        .history-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 10px;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #9aa0a6;
+            transition: background 0.15s, color 0.15s;
+            gap: 4px;
+        }
+        .history-item:hover {
+            background: #282a2c;
+            color: #e3e3e3;
+        }
+        .history-item.active {
+            background: #252729;
+            color: #fff;
+            border-left: 2px solid #4285f4;
+            padding-left: 8px;
+        }
+        .history-item.pinned .pin-icon {
+            opacity: 1;
+            color: #4285f4;
+        }
+        .history-item-title {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .pin-icon {
+            opacity: 0;
+            font-size: 11px;
+            flex-shrink: 0;
+            transition: opacity 0.15s;
+            cursor: pointer;
+            padding: 2px;
+        }
+        .history-item:hover .pin-icon {
+            opacity: 0.5;
+        }
+        .pin-icon:hover {
+            opacity: 1 !important;
+        }
+        .delete-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: #5f6368;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-size: 12px;
+            flex-shrink: 0;
+            opacity: 0;
+            transition: opacity 0.15s, background 0.15s, color 0.15s;
+        }
+        .history-item:hover .delete-btn {
+            opacity: 1;
+        }
+        .delete-btn:hover {
+            background: #3c1f1f;
+            color: #e57373;
+        }
+
+        .sidebar-footer {
+            font-size: 10px;
+            color: #3c3e40;
+            text-align: center;
+            padding-top: 8px;
+            border-top: 1px solid #2c2d2f;
+            flex-shrink: 0;
+        }
+
+        /* --- MAIN --- */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
+        }
+        .topbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            border-bottom: 1px solid #2c2d2f;
+            flex-shrink: 0;
+        }
+        .topbar-title {
+            font-size: 16px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #4285f4, #9b51e0, #e91e63);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            flex: 1;
+        }
+        .topbar-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .welcome {
+            text-align: center;
+            padding: 50px 20px 0;
+            flex-shrink: 0;
+        }
+        .welcome h1 {
+            font-size: 30px;
+            font-weight: 500;
+            background: linear-gradient(90deg, #4285f4, #9b51e0, #e91e63);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .welcome p {
+            color: #5f6368;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            min-height: 0;
+        }
+        .chat-area::-webkit-scrollbar {
+            width: 5px;
+        }
+        .chat-area::-webkit-scrollbar-thumb {
+            background: #3c4043;
+            border-radius: 4px;
+        }
+
+        /* --- MESSAGES --- */
+        .msg-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .msg-wrap.user {
+            align-items: flex-end;
+        }
+        .msg-wrap.ai {
+            align-items: flex-start;
+        }
+
+        .msg {
+            max-width: 75%;
+            padding: 12px 16px;
+            font-size: 15px;
+            line-height: 1.7;
+            word-wrap: break-word;
+        }
+        .msg.user {
+            background: #2a2d30;
+            border-radius: 16px 16px 4px 16px;
+            color: #e3e3e3;
+        }
+        .msg.ai {
+            background: transparent;
+            border-left: 3px solid #4285f4;
+            padding-left: 14px;
+            border-radius: 0;
+            color: #d1d5db;
+            max-width: 88%;
+        }
+        .msg.ai.loading {
+            color: #5f6368;
+            font-style: italic;
+        }
+
+        /* Markdown inside ai message */
+        .msg.ai p {
+            margin-bottom: 8px;
+        }
+        .msg.ai p:last-child {
+            margin-bottom: 0;
+        }
+        .msg.ai ul,
+        .msg.ai ol {
+            padding-left: 20px;
+            margin-bottom: 8px;
+        }
+        .msg.ai li {
+            margin-bottom: 4px;
+        }
+        .msg.ai h1,
+        .msg.ai h2,
+        .msg.ai h3 {
+            margin: 10px 0 6px;
+            color: #e3e3e3;
+        }
+        .msg.ai strong {
+            color: #e3e3e3;
+        }
+        .msg.ai code {
+            background: #1e1f20;
+            border: 1px solid #2c2d2f;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #a8d8ff;
+        }
+        .msg.ai pre {
+            background: #1a1b1c;
+            border: 1px solid #2c2d2f;
+            border-radius: 8px;
+            padding: 12px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+        .msg.ai pre code {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 13px;
+        }
+        .msg.ai a {
+            color: #4285f4;
+        }
+        .msg.ai blockquote {
+            border-left: 3px solid #3c3e40;
+            padding-left: 12px;
+            color: #9aa0a6;
+            margin: 6px 0;
+        }
+
+        /* MSG ACTIONS */
+        .msg-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .msg-wrap:hover .msg-actions {
+            opacity: 1;
+        }
+        .action-btn {
+            background: transparent;
+            border: 1px solid #2c2d2f;
+            color: #5f6368;
+            padding: 3px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .action-btn:hover {
+            background: #282a2c;
+            color: #e3e3e3;
+            border-color: #3c3e40;
+        }
+        .action-btn.copied {
+            color: #4caf50;
+            border-color: #4caf50;
+        }
+
+        /* --- INPUT --- */
+        .input-wrap {
+            padding: 10px 24px 20px;
+            flex-shrink: 0;
+        }
+        .input-box {
+            display: flex;
+            align-items: center;
+            background: #1e1f20;
+            border: 1px solid #3c3e40;
+            border-radius: 12px;
+            padding: 6px 6px 6px 14px;
+            transition: border-color 0.2s;
+        }
+        .input-box:focus-within {
+            border-color: #4285f4;
+        }
+        .input-box input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #fff;
+            font-size: 15px;
+            padding: 8px 0;
+        }
+        .input-box input::placeholder {
+            color: #5f6368;
+        }
+        .send-btn {
+            background: #4285f4;
+            color: #fff;
+            border: none;
+            padding: 9px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+        .send-btn:hover {
+            background: #3367d6;
+        }
+        .send-btn:disabled {
+            background: #2c2d2f;
+            color: #5f6368;
+            cursor: not-allowed;
+        }
+
+        /* --- THEME LIGHT --- */
+        body.light {
+            background: #f5f5f5;
+            color: #1a1a1a;
+        }
+        body.light .sidebar {
+            background: #ffffff;
+            border-color: #e0e0e0;
+        }
+        body.light .sidebar-logo {
+            filter: none;
+        }
+        body.light .new-chat-btn {
+            border-color: #d0d0d0;
+            color: #444;
+        }
+        body.light .new-chat-btn:hover {
+            background: #f0f0f0;
+        }
+        body.light .search-box {
+            background: #f0f0f0;
+            border-color: #e0e0e0;
+        }
+        body.light .search-box input {
+            color: #1a1a1a;
+        }
+        body.light .history-item {
+            color: #666;
+        }
+        body.light .history-item:hover {
+            background: #f0f0f0;
+            color: #1a1a1a;
+        }
+        body.light .history-item.active {
+            background: #e8f0fe;
+            color: #1a1a1a;
+        }
+        body.light .topbar {
+            border-color: #e0e0e0;
+        }
+        body.light .msg.user {
+            background: #e8f0fe;
+            color: #1a1a1a;
+        }
+        body.light .msg.ai {
+            color: #333;
+        }
+        body.light .msg.ai code {
+            background: #f0f0f0;
+            border-color: #e0e0e0;
+            color: #0066cc;
+        }
+        body.light .msg.ai pre {
+            background: #f5f5f5;
+            border-color: #e0e0e0;
+        }
+        body.light .input-box {
+            background: #ffffff;
+            border-color: #d0d0d0;
+        }
+        body.light .input-box input {
+            color: #1a1a1a;
+        }
+        body.light .action-btn {
+            border-color: #e0e0e0;
+            color: #888;
+        }
+        body.light .action-btn:hover {
+            background: #f0f0f0;
+            color: #1a1a1a;
+        }
+        body.light .icon-btn {
+            color: #666;
+        }
+        body.light .icon-btn:hover {
+            background: #f0f0f0;
+            color: #1a1a1a;
+        }
+        body.light .sidebar-footer {
+            color: #bbb;
+            border-color: #e0e0e0;
+        }
+        body.light .topbar-actions .icon-btn {
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-top">
+            <div class="sidebar-logo">BOSTX AI</div>
+            <button class="icon-btn" onclick="closeSidebar()" title="Закрыть">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+        </div>
+        <button class="new-chat-btn" onclick="newChat()">+ Новый чат</button>
+        <div class="search-box">
+            <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+            <input type="text" id="search-input" placeholder="Поиск чатов..." oninput="renderSidebar()">
+        </div>
+        <div class="history-label">История</div>
+        <div class="history-list" id="history-list"></div>
+        <div class="sidebar-footer">BOSTX AI</div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main">
+        <div class="topbar">
+            <button class="icon-btn" onclick="openSidebar()" title="История">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+            </button>
+            <div class="topbar-title">BOSTX AI</div>
+            <div class="topbar-actions">
+                <button class="icon-btn" onclick="exportChat()" title="Экспорт чата">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                </button>
+                <button class="icon-btn" onclick="toggleTheme()" title="Тема">
+                    <svg id="theme-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="welcome" id="welcome">
+            <h1>Привет, я BOSTX AI</h1>
+            <p>Чем могу помочь сегодня?</p>
+        </div>
+        <div class="chat-area" id="chat-area"></div>
+        <div class="input-wrap">
+            <div class="input-box">
+                <input type="text" id="user-input" placeholder="Введите запрос..." onkeypress="handleKey(event)">
+                <button class="send-btn" id="send-btn" onclick="sendMessage()">Отправить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        // ---- КЛЮЧИ И API ----
+        const GEMINI_KEY = "AQ.Ab8RN6J3B44K9yHdiDz_3ylea81Cvu4WvCaO7Y4rcn6sCXQI9w";
+        const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_KEY;
+
+        // ---- DOM-ссылки ----
+        const chatArea = document.getElementById('chat-area');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const welcome = document.getElementById('welcome');
+        const historyEl = document.getElementById('history-list');
+        const sidebar = document.getElementById('sidebar');
+        const searchInput = document.getElementById('search-input');
+
+        // ---- Состояние ----
+        let sessions = [];
+        let activeId = null;
+        let isLight = false;
+
+        // ---- Настройка marked ----
+        marked.setOptions({ breaks: true, gfm: true });
+
+        // ---- Вспомогательные функции ----
+        function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+        function openSidebar() { sidebar.classList.remove('hidden'); }
+
+        function closeSidebar() { sidebar.classList.add('hidden'); }
+
+        function toggleTheme() {
+            isLight = !isLight;
+            document.body.classList.toggle('light', isLight);
+            localStorage.setItem('bostx_theme', isLight ? 'light' : 'dark');
+        }
+
+        // ---- Сохранение / загрузка ----
+        function save() {
+            localStorage.setItem('bostx_sessions', JSON.stringify(sessions));
+            localStorage.setItem('bostx_active', activeId);
+        }
+
+        function load() {
+            try {
+                const s = localStorage.getItem('bostx_sessions');
+                const a = localStorage.getItem('bostx_active');
+                const t = localStorage.getItem('bostx_theme');
+                if (s) sessions = JSON.parse(s);
+                if (a) activeId = a;
+                if (t === 'light') { isLight = true;
+                    document.body.classList.add('light'); }
+            } catch (e) {}
+        }
+
+        // ---- Управление чатами ----
+        function newChat() {
+            const id = uid();
+            sessions.unshift({ id, title: 'Новый чат', messages: [], pinned: false });
+            activeId = id;
+            save();
+            renderSidebar();
+            renderChat();
+            userInput.focus();
+        }
+
+        function switchTo(id) {
+            activeId = id;
+            save();
+            renderSidebar();
+            renderChat();
+            userInput.focus();
+        }
+
+        function deleteChat(e, id) {
+            e.stopPropagation();
+            sessions = sessions.filter(s => s.id !== id);
+            if (activeId === id) {
+                activeId = sessions.length > 0 ? sessions[0].id : null;
+                if (!activeId) { newChat(); return; }
+                renderChat();
+            }
+            save();
+            renderSidebar();
+        }
+
+        function togglePin(e, id) {
+            e.stopPropagation();
+            const s = sessions.find(s => s.id === id);
+            if (s) { s.pinned = !s.pinned;
+                save();
+                renderSidebar(); }
+        }
+
+        // ---- Отрисовка боковой панели ----
+        function renderSidebar() {
+            historyEl.innerHTML = '';
+            const q = searchInput.value.toLowerCase();
+            const pinned = sessions.filter(s => s.pinned && (!q || s.title.toLowerCase().includes(q)));
+            const rest = sessions.filter(s => !s.pinned && (!q || s.title.toLowerCase().includes(q)));
+            const sorted = [...pinned, ...rest];
+            sorted.forEach(s => {
+                const el = document.createElement('div');
+                el.className = 'history-item' + (s.id === activeId ? ' active' : '') + (s.pinned ? ' pinned' : '');
+
+                const pin = document.createElement('span');
+                pin.className = 'pin-icon';
+                pin.textContent = '📌';
+                pin.title = s.pinned ? 'Открепить' : 'Закрепить';
+                pin.onclick = (e) => togglePin(e, s.id);
+
+                const title = document.createElement('span');
+                title.className = 'history-item-title';
+                title.textContent = s.title;
+                title.title = s.title;
+
+                const del = document.createElement('button');
+                del.className = 'delete-btn';
+                del.textContent = '✕';
+                del.title = 'Удалить';
+                del.onclick = (e) => deleteChat(e, s.id);
+
+                el.appendChild(pin);
+                el.appendChild(title);
+                el.appendChild(del);
+                el.onclick = () => switchTo(s.id);
+                historyEl.appendChild(el);
+            });
+        }
+
+        // ---- Отрисовка сообщений ----
+        function renderChat() {
+            chatArea.innerHTML = '';
+            const s = sessions.find(s => s.id === activeId);
+            const has = s && s.messages.length > 0;
+            welcome.style.display = has ? 'none' : 'block';
+            if (!has) return;
+            s.messages.forEach((m, i) => appendBubble(m.role, m.text, false, i));
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function appendBubble(role, text, isNew = true, idx = null) {
+            welcome.style.display = 'none';
+            const wrap = document.createElement('div');
+            wrap.className = 'msg-wrap ' + (role === 'user' ? 'user' : 'ai');
+
+            const msg = document.createElement('div');
+            msg.className = 'msg ' + (role === 'user' ? 'user' : 'ai');
+            if (role === 'ai') {
+                msg.innerHTML = marked.parse(text);
+            } else {
+                msg.innerText = text;
+            }
+            wrap.appendChild(msg);
+
+            // Actions
+            const actions = document.createElement('div');
+            actions.className = 'msg-actions';
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'action-btn';
+            copyBtn.innerHTML = '📋 Копировать';
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(text).then(() => {
+                    copyBtn.innerHTML = '✓ Скопировано';
+                    copyBtn.classList.add('copied');
+                    setTimeout(() => {
+                        copyBtn.innerHTML = '📋 Копировать';
+                        copyBtn.classList.remove('copied');
+                    }, 1500);
+                });
+            };
+            actions.appendChild(copyBtn);
+
+            if (role === 'ai') {
+                const regenBtn = document.createElement('button');
+                regenBtn.className = 'action-btn';
+                regenBtn.innerHTML = '🔄 Повторить';
+                regenBtn.onclick = () => regenerate(wrap);
+                actions.appendChild(regenBtn);
+            }
+
+            wrap.appendChild(actions);
+            chatArea.appendChild(wrap);
+            if (isNew) chatArea.scrollTop = chatArea.scrollHeight;
+            return msg;
+        }
+
+        // ---- Regenerate ----
+        async function regenerate(aiWrap) {
+            const s = sessions.find(s => s.id === activeId);
+            if (!s || s.messages.length < 2) return;
+            if (s.messages[s.messages.length - 1].role === 'ai') s.messages.pop();
+            aiWrap.remove();
+            await callAPI(s);
+        }
+
+        // ---- Отправка сообщения ----
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+            if (!activeId) newChat();
+
+            const s = sessions.find(s => s.id === activeId);
+            s.messages.push({ role: 'user', text });
+            if (s.title === 'Новый чат') {
+                s.title = text.length > 26 ? text.slice(0, 26) + '…' : text;
+            }
+            save();
+            renderSidebar();
+            appendBubble('user', text);
+            userInput.value = '';
+            await callAPI(s);
+        }
+
+        // ---- Вызов API (исправлено) ----
+        async function callAPI(s) {
+            userInput.disabled = true;
+            sendBtn.disabled = true;
+
+            const loaderWrap = document.createElement('div');
+            loaderWrap.className = 'msg-wrap ai';
+            const loaderMsg = document.createElement('div');
+            loaderMsg.className = 'msg ai loading';
+            loaderMsg.innerText = 'Печатает…';
+            loaderWrap.appendChild(loaderMsg);
+            chatArea.appendChild(loaderWrap);
+            chatArea.scrollTop = chatArea.scrollHeight;
+
+            const contents = s.messages.map(m => ({
+                role: m.role === 'user' ? 'user' : 'model',
+                parts: [{ text: m.text }]
+            }));
+
+            try {
+                const res = await fetch(GEMINI_API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents })
+                });
+                const data = await res.json();
+                loaderWrap.remove();
+
+                const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (data.error) {
+                    appendBubble('ai', '❌ Ошибка: ' + data.error.message);
+                } else if (aiText) {
+                    s.messages.push({ role: 'ai', text: aiText });
+                    save();
+                    appendBubble('ai', aiText);
+                } else {
+                    appendBubble('ai', '❌ Пустой ответ.');
+                }
+            } catch (err) {
+                loaderWrap.remove();
+                appendBubble('ai', '❌ Ошибка соединения: ' + err.message);
+            } finally {
+                chatArea.scrollTop = chatArea.scrollHeight;
+                userInput.disabled = false;
+                sendBtn.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        // ---- Экспорт ----
+        function exportChat() {
+            const s = sessions.find(s => s.id === activeId);
+            if (!s || s.messages.length === 0) return alert('Нет сообщений для экспорта');
+            const text = s.messages.map(m => (m.role === 'user' ? '👤 Вы:\n' : '🤖 BOSTX AI:\n') + m.text).join('\n\n---\n\n');
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = (s.title || 'chat') + '.txt';
+            a.click();
+        }
+
+        function handleKey(e) { if (e.key === 'Enter') sendMessage(); }
+
+        // ---- Инициализация ----
+        load();
+        if (sessions.length === 0 || !activeId || !sessions.find(s => s.id === activeId)) {
+            newChat();
+        } else {
+            renderSidebar();
+            renderChat();
+        }
+    </script>
+</body>
+</html>
