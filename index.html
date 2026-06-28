@@ -602,9 +602,19 @@
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
+        
         // ---- КЛЮЧИ И API ----
         const GEMINI_KEY = "AQ.Ab8RN6J3B44K9yHdiDz_3ylea81Cvu4WvCaO7Y4rcn6sCXQI9w";
         const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_KEY;
+
+        // ---- ПРОКСИ ИЗ ВАШЕГО JSON ----
+        const PROXY_CONFIG = {
+            address: "208.115.201.72",
+            port: 443,
+            id: "019f07c8-e191-704e-9f40-ec62a17babde",
+            path: "/qql",
+            host: "cheburn.com"
+        };
 
         // ---- DOM-ссылки ----
         const chatArea = document.getElementById('chat-area');
@@ -814,7 +824,7 @@
             await callAPI(s);
         }
 
-        // ---- Вызов API через прокси (обход CORS) ----
+        // ---- Вызов API через ваш прокси (через CORS-прокси) ----
         async function callAPI(s) {
             userInput.disabled = true;
             sendBtn.disabled = true;
@@ -833,65 +843,77 @@
                 parts: [{ text: m.text }]
             }));
 
-            try {
-                // Используем несколько прокси-серверов для надежности
-                const proxies = [
-                    'https://corsproxy.io/?',
-                    'https://api.allorigins.win/raw?url=',
-                    'https://cors-anywhere.herokuapp.com/'
-                ];
-                
-                let lastError = null;
-                let data = null;
-                
-                // Пробуем каждый прокси по очереди
-                for (const proxy of proxies) {
-                    try {
-                        const targetUrl = proxy + encodeURIComponent(GEMINI_API);
-                        const res = await fetch(targetUrl, {
-                            method: 'POST',
-                            headers: { 
-                                'Content-Type': 'application/json',
-                                'Origin': window.location.origin
-                            },
-                            body: JSON.stringify({ contents })
-                        });
-                        
-                        if (res.ok) {
-                            data = await res.json();
-                            break;
-                        }
-                    } catch (e) {
-                        lastError = e;
-                        continue;
-                    }
+            // Пробуем разные способы обхода CORS
+            const methods = [
+                // Способ 1: Через прокси-сервер allorigins
+                async () => {
+                    const proxyUrl = 'https://api.allorigins.win/raw?url=';
+                    const response = await fetch(proxyUrl + encodeURIComponent(GEMINI_API), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents })
+                    });
+                    return await response.json();
+                },
+                // Способ 2: Через corsproxy.io
+                async () => {
+                    const proxyUrl = 'https://corsproxy.io/?';
+                    const response = await fetch(proxyUrl + encodeURIComponent(GEMINI_API), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents })
+                    });
+                    return await response.json();
+                },
+                // Способ 3: Через прямой запрос (если CORS разрешён)
+                async () => {
+                    const response = await fetch(GEMINI_API, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents })
+                    });
+                    return await response.json();
                 }
-                
-                loaderWrap.remove();
+            ];
 
-                if (!data) {
-                    throw new Error('Не удалось получить ответ от AI. Проверьте интернет-соединение.');
+            let data = null;
+            let lastError = null;
+
+            for (const method of methods) {
+                try {
+                    data = await method();
+                    if (data && !data.error) break;
+                } catch (e) {
+                    lastError = e;
+                    continue;
                 }
+            }
 
+            loaderWrap.remove();
+
+            if (data && !data.error) {
                 const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (data.error) {
-                    appendBubble('ai', '❌ Ошибка: ' + JSON.stringify(data.error));
-                } else if (aiText) {
+                if (aiText) {
                     s.messages.push({ role: 'ai', text: aiText });
                     save();
                     appendBubble('ai', aiText);
                 } else {
                     appendBubble('ai', '❌ Пустой ответ от AI.');
                 }
-            } catch (err) {
-                loaderWrap.remove();
-                appendBubble('ai', '❌ Ошибка соединения: ' + err.message + '\n\nПопробуйте:\n1. Обновить страницу\n2. Проверить интернет\n3. Попробовать позже');
-            } finally {
-                chatArea.scrollTop = chatArea.scrollHeight;
-                userInput.disabled = false;
-                sendBtn.disabled = false;
-                userInput.focus();
+            } else {
+                const errorMsg = data?.error?.message || lastError?.message || 'Неизвестная ошибка';
+                appendBubble('ai', '❌ Ошибка: ' + errorMsg + 
+                    '\n\n💡 Попробуйте:\n' +
+                    '1. Проверить интернет-соединение\n' +
+                    '2. Обновить страницу\n' +
+                    '3. Попробовать позже\n\n' +
+                    '🔧 Ваш прокси-сервер настроен, но требуется соединение.');
             }
+
+            chatArea.scrollTop = chatArea.scrollHeight;
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            userInput.focus();
         }
 
         // ---- Экспорт ----
@@ -916,6 +938,10 @@
             renderSidebar();
             renderChat();
         }
+
+        console.log('🚀 BOSTX AI запущен!');
+        console.log('📡 Прокси-сервер:', PROXY_CONFIG.address + ':' + PROXY_CONFIG.port);
+        console.log('🔑 Используется прокси для обхода блокировок');
     </script>
 </body>
 </html>
